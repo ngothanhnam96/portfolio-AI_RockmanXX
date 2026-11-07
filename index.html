@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d16">
+  <meta name="description" content="Chiến Binh Volt — game hành động bắn súng màn hình ngang: chạy, nhảy, lướt, bám tường, tụ lực và lấy vũ khí của trùm.">
+  <title>Chiến Binh Volt</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="hud hidden" id="hud">
+    <div class="meters">
+      <div class="meter">
+        <span class="meter-label">HP</span>
+        <div class="track"><div class="fill hp" id="hp-fill"></div></div>
+      </div>
+      <div class="meter" id="energy-bar" hidden>
+        <span class="meter-label" id="weapon-label">Súng Volt</span>
+        <div class="track"><div class="fill" id="energy-fill"></div></div>
+      </div>
+    </div>
+
+    <div class="weapons" id="weapons" aria-label="Vũ khí"></div>
+
+    <div class="boss" id="boss-bar" hidden>
+      <span class="meter-label" id="boss-name">Trùm</span>
+      <div class="track"><div class="fill boss-fill" id="boss-fill"></div></div>
+    </div>
+
+    <dl class="stats">
+      <div><dt>Mạng</dt><dd id="lives">×3</dd></div>
+      <div><dt>Điểm</dt><dd id="score">000000</dd></div>
+    </dl>
+
+    <div class="actions">
+      <button class="action" id="pause-btn" title="Tạm dừng (P)" aria-label="Tạm dừng">⏸</button>
+      <button class="action" id="sound-btn" title="Âm thanh (M)" aria-label="Âm thanh" aria-pressed="true">🔊</button>
+    </div>
+  </header>
+
+  <main class="stage" id="stage">
+    <canvas id="screen" width="320" height="192" aria-label="Màn chơi"></canvas>
+
+    <div class="touch" id="touch" aria-hidden="true">
+      <div class="pad">
+        <button data-button="left">◀</button>
+        <button data-button="right">▶</button>
+      </div>
+      <div class="pad pad-right">
+        <button data-command="weapon-next" class="small">⇄</button>
+        <button data-button="dash">Lướt</button>
+        <button data-button="shoot">Bắn</button>
+        <button data-button="jump" class="big">Nhảy</button>
+      </div>
+    </div>
+  </main>
+
+  <section class="overlay" id="overlay" role="dialog" aria-modal="true">
+    <div class="panel" id="panel"></div>
+  </section>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

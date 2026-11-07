@@ -1,0 +1,15 @@
+{
+  "name": "chien-binh-volt",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chien Binh Volt - an original run-and-gun action platformer for the browser.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
