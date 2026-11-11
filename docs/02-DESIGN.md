@@ -95,6 +95,14 @@ Scripted-bot fight times (invincible bot, buster vs. weakness):
 | Băng Tiễn | 3-way spread | 2 each | 1 |
 | Lôi Xà | fast, piercing | 2 | 1 |
 
+Lam Phong's versions (melee boxes like his slashes: hit each target once, cut enemy shots, 0.25 s cooldown):
+
+| Blade technique | From | Strike | Box (w × h) | Damage | Energy |
+|-----------------|------|--------|-------------|--------|--------|
+| Hỏa Long Kiếm | Hỏa Cầu | rising flame slash, reaches 36 px above the head | 28 × 58 | 3 | 2 |
+| Băng Thứ Kiếm | Băng Tiễn | long ice thrust ahead | 50 × 10 | 2 | 1 |
+| Lôi Toàn Kiếm | Lôi Xà | lightning spin, both sides | 60 × 30 | 2 | 1 |
+
 Energy refills on every stage start and respawn. Pickups: health +4 / +12, energy +8 (to the
 current special, or the emptiest one if the buster is held), extra life (max 9). Each kill drops
 something about 26 % of the time (seeded RNG).

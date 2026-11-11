@@ -6,7 +6,7 @@
 import { ROWS, TILE, VIEW_H, VIEW_W } from "../core/constants.js";
 import { T_DOOR, T_HAZARD, T_ONEWAY, T_SOLID } from "../core/level.js";
 import { WEAPONS } from "../core/weapons.js";
-import { HERO, THEMES } from "./themes.js";
+import { HERO, LAM, THEMES } from "./themes.js";
 
 // ------------------------------------------------------------------ particles
 
@@ -53,6 +53,7 @@ export function createRenderer(canvas) {
   let scale = 1;
   let camX = 0;
   let shake = 0;
+  let pal = HERO; // palette of the hero being played (for the 1-up icon)
 
   function resize() {
     // Size from the layout viewport, not the parent: the parent grows with the canvas itself.
@@ -298,6 +299,8 @@ export function createRenderer(canvas) {
     if (!p.alive) return;
     if (p.invulnT > 0 && Math.floor(time * 20) % 2 === 0) return;
     const facing = p.facing;
+    const lam = p.hero === "lam";
+    const C = lam ? LAM : HERO;
     const part = sprite(p.x, p.y, p.w, facing);
     const run = p.onGround && Math.abs(p.vx) > 1 && !p.dashing ? Math.floor(time * 10) % 4 : -1;
     const air = !p.onGround && p.wallDir === 0;
@@ -306,57 +309,81 @@ export function createRenderer(canvas) {
     // after-images while dashing
     if (p.dashing || p.dashJump) {
       ctx.globalAlpha = 0.3;
-      rect(p.x - facing * 6, p.y + 6, p.w, p.h - 8, HERO.visor);
+      rect(p.x - facing * 6, p.y + 6, p.w, p.h - 8, C.visor);
       ctx.globalAlpha = 1;
     }
 
     // charge aura
     if (p.chargeLevel > 0) {
-      const colors = p.chargeLevel === 2 ? ["#5ff2ff", "#ffffff"] : ["#ffd23f", "#fff3b0"];
+      const colors = lam
+        ? (p.chargeLevel === 2 ? ["#3ff5c8", "#ffffff"] : ["#8ff5df", "#eafff9"])
+        : (p.chargeLevel === 2 ? ["#5ff2ff", "#ffffff"] : ["#ffd23f", "#fff3b0"]);
       ctx.globalAlpha = 0.5;
       const pulse = Math.floor(time * 24) % 2;
       rect(p.x - 2, p.y - 2, p.w + 4, p.h + 4, colors[pulse]);
       ctx.globalAlpha = 1;
     }
 
+    // Lam Phong's scarf streams behind the head
+    if (lam) {
+      const wave = Math.floor(time * 8) % 2;
+      const trail = p.dashing || p.dashJump || Math.abs(p.vx) > 1 ? 9 : 5;
+      part(-trail + 2, 6 + wave, trail, 2, C.scarf);
+      part(-trail, 7 - wave, 3, 2, C.scarf);
+    }
+
     // legs
     if (p.dashing) {
-      part(-2, 15, 6, 4, HERO.suit);
-      part(-4, 18, 6, 4, HERO.armor);
-      part(6, 16, 5, 6, HERO.armor);
+      part(-2, 15, 6, 4, C.suit);
+      part(-4, 18, 6, 4, C.armor);
+      part(6, 16, 5, 6, C.armor);
     } else if (air) {
-      part(1, 15, 4, 5, HERO.suit);
-      part(0, 18, 5, 3, HERO.armor);
-      part(7, 14, 4, 5, HERO.suit);
-      part(7, 17, 5, 3, HERO.armor);
+      part(1, 15, 4, 5, C.suit);
+      part(0, 18, 5, 3, C.armor);
+      part(7, 14, 4, 5, C.suit);
+      part(7, 17, 5, 3, C.armor);
     } else {
-      part(1 + legOffset, 15, 4, 4, HERO.suit);
-      part(0 + legOffset, 18, 6, 4, HERO.armor);
-      part(7 - legOffset, 15, 4, 4, HERO.suit);
-      part(6 - legOffset, 18, 6, 4, HERO.armor);
-      part(0 + legOffset, 21, 6, 1, HERO.armorDark);
-      part(6 - legOffset, 21, 6, 1, HERO.armorDark);
+      part(1 + legOffset, 15, 4, 4, C.suit);
+      part(0 + legOffset, 18, 6, 4, C.armor);
+      part(7 - legOffset, 15, 4, 4, C.suit);
+      part(6 - legOffset, 18, 6, 4, C.armor);
+      part(0 + legOffset, 21, 6, 1, C.armorDark);
+      part(6 - legOffset, 21, 6, 1, C.armorDark);
     }
     // torso
-    part(1, 8, 10, 8, HERO.suit);
-    part(3, 9, 6, 4, HERO.armor);
-    part(4, 10, 2, 2, HERO.armorLight);
-    part(1, 14, 10, 2, HERO.armorDark);
+    part(1, 8, 10, 8, C.suit);
+    part(3, 9, 6, 4, C.armor);
+    part(4, 10, 2, 2, C.armorLight);
+    part(1, 14, 10, 2, C.armorDark);
     // head
-    part(1, 0, 10, 8, HERO.armor);
-    part(2, -2, 3, 2, HERO.armorDark);
-    part(5, 3, 7, 3, HERO.outline);
-    part(6, 4, 5, 1, HERO.visor);
-    part(1, 0, 10, 1, HERO.armorLight);
-    // arm / cannon
+    part(1, 0, 10, 8, C.armor);
+    part(2, -2, 3, 2, C.armorDark);
+    part(5, 3, 7, 3, C.outline);
+    part(6, 4, 5, 1, C.visor);
+    part(1, 0, 10, 1, C.armorLight);
+    // arm / cannon (Volt) or sword arm (Lam Phong)
     const shooting = p.shootT > 0 || p.chargeLevel > 0;
-    if (shooting) {
-      part(7, 9, 8, 4, HERO.armor);
+    const slashing = lam && game.bullets.some((b) => b.melee);
+    if (lam) {
+      if (slashing) {
+        part(7, 8, 7, 3, C.armor);
+        part(13, 7, 2, 5, C.armorDark); // hilt, the blade itself is the slash arc
+      } else if (p.chargeLevel > 0) {
+        part(7, 10, 5, 3, C.armor);
+        part(10, 2, 2, 10, Math.floor(time * 24) % 2 ? C.blade : C.bladeCore); // blade raised, glowing
+      } else {
+        part(-1, 1, 2, 12, C.armorDark); // sheathed on the back
+        part(-2, 12, 4, 2, C.armorDark);
+        if (game.weapon !== "buster") part(-1, -1, 2, 2, WEAPONS[game.weapon].color); // the learned technique glows at the pommel
+        part(4 - legOffset / 2, 10, 4, 6, C.armorDark);
+      }
+    } else if (shooting) {
+      part(7, 9, 8, 4, C.armor);
       part(14, 9, 2, 4, WEAPONS[game.weapon].color);
     } else if (p.wallDir !== 0) {
-      part(8, 6, 4, 6, HERO.armor);
+      part(8, 6, 4, 6, C.armor);
     } else {
-      part(4 - legOffset / 2, 10, 4, 6, HERO.armorDark);
+      part(4 - legOffset / 2, 10, 4, 6, C.armorDark);
     }
     if (p.hurtT > 0) {
       ctx.globalAlpha = 0.5;
@@ -505,6 +532,28 @@ export function createRenderer(canvas) {
         circle(cx, cy, 9, Math.floor(time * 20) % 2 ? "#5ff2ff" : "#b5fbff");
         circle(cx, cy, 5, "#ffffff");
         break;
+      case "slash":
+      case "slash-wide":
+      case "slash-air":
+        drawSlash(b);
+        break;
+      case "art-ember":
+      case "art-frost":
+      case "art-storm":
+        drawArt(b, time);
+        break;
+      case "wave": {
+        const dir = Math.sign(b.vx) || 1;
+        ctx.globalAlpha = 0.5;
+        for (const [dy, len] of [[5, 10], [10, 16], [16, 8]]) rect(dir > 0 ? b.x - len : b.x + b.w, b.y + dy, len, 1, LAM.blade);
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = Math.floor(time * 20) % 2 ? LAM.blade : LAM.bladeCore;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(b.x - camX + b.w / 2 - dir * 6, cy, b.h / 2, -Math.PI / 2.4, Math.PI / 2.4, dir < 0);
+        ctx.stroke();
+        break;
+      }
       case "ember":
         circle(cx, cy, 6, "#ff5a14");
         circle(cx, cy, 3, "#ffe27a");
@@ -534,6 +583,126 @@ export function createRenderer(canvas) {
         rect(b.x, b.y, b.w, b.h, "#ffffff");
     }
     if (b.deflected) rect(b.x, b.y, b.w, b.h, "rgba(255,255,255,0.6)");
+  }
+
+  /** A blade slash: a bright crescent that sweeps and fades while the hitbox is out. */
+  function drawSlash(b) {
+    const total = b.kind === "slash-wide" ? 0.18 : 0.14;
+    const t = 1 - Math.max(0, b.life) / total; // 0 → 1 over the slash
+    const cx = b.x - camX + b.w / 2;
+    const cy = b.y + b.h / 2;
+    ctx.globalAlpha = Math.max(0.15, 1 - t * 0.8);
+    ctx.lineCap = "round";
+    if (b.kind === "slash-air") {
+      const r = Math.min(b.w, b.h) / 2;
+      const a = t * Math.PI * 2;
+      ctx.strokeStyle = LAM.blade;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, a, a + Math.PI * 1.4);
+      ctx.stroke();
+      ctx.strokeStyle = LAM.bladeCore;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, a + 0.3, a + Math.PI * 1.2);
+      ctx.stroke();
+    } else {
+      // centre the arc on the hero's side of the box so it sweeps outward
+      const dir = b.facing;
+      const ox = dir > 0 ? b.x - camX : b.x - camX + b.w;
+      const r = b.w - 2;
+      const down = b.step === 1; // the 2nd hit of the combo sweeps upward instead
+      const from = down ? Math.PI / 2.2 : -Math.PI / 2.2;
+      const sweep = (down ? -1 : 1) * (Math.PI / 1.1) * Math.min(1, 0.35 + t * 1.3);
+      const start = dir > 0 ? from : Math.PI - from;
+      const finish = dir > 0 ? from + sweep : Math.PI - from - sweep;
+      const ccw = dir > 0 ? sweep < 0 : sweep > 0;
+      ctx.strokeStyle = LAM.blade;
+      ctx.lineWidth = b.kind === "slash-wide" ? 6 : b.step === 2 ? 5 : 4;
+      ctx.beginPath();
+      ctx.arc(ox, cy, r, start, finish, ccw);
+      ctx.stroke();
+      ctx.strokeStyle = LAM.bladeCore;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(ox, cy, r - 1, start, finish, ccw);
+      ctx.stroke();
+    }
+    ctx.lineCap = "butt";
+    ctx.globalAlpha = 1;
+  }
+
+  /** Lam Phong's boss techniques: a rising flame slash, an ice thrust, a lightning spin. */
+  function drawArt(b, time) {
+    const t = 1 - Math.max(0, b.life) / b.total; // 0 → 1 over the strike
+    const dir = b.facing;
+    const flick = Math.floor(time * 24) % 2;
+    ctx.globalAlpha = Math.max(0.2, 1 - t * 0.75);
+    ctx.lineCap = "round";
+    if (b.kind === "art-ember") {
+      // an upward crescent from the feet to above the head, flames licking up the column
+      const ox = dir > 0 ? b.x - camX : b.x - camX + b.w;
+      const oy = b.y + b.h;
+      const r = b.w;
+      const sweep = (Math.PI / 2) * Math.min(1, 0.3 + t * 1.6);
+      const start = dir > 0 ? 0 : Math.PI;
+      const finish = dir > 0 ? -sweep : Math.PI + sweep;
+      for (const [color, width] of [["#ff5a14", 6], ["#ffe27a", 2]]) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.beginPath();
+        ctx.arc(ox, oy - 4, r, start, finish, dir > 0);
+        ctx.stroke();
+      }
+      for (let i = 0; i < 4; i += 1) {
+        const rise = (time * 90 + i * 13) % (b.h - 6);
+        const fh = 4 + ((i + flick) % 2) * 3;
+        rect(b.x + 3 + i * 6, b.y + b.h - rise - fh, 3, fh, i % 2 ? "#ffb02e" : "#ff5a14");
+      }
+    } else if (b.kind === "art-frost") {
+      // a long ice lance: wide at the hilt, a bright point at the tip
+      const reach = b.w * Math.min(1, 0.4 + t * 2);
+      const base = dir > 0 ? b.x : b.x + b.w;
+      const tip = base + dir * reach;
+      const cy = b.y + b.h / 2;
+      for (const [color, half, back] of [["#7fe3ff", 4, 0], ["#ffffff", 1, 2]]) {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(sx(base), cy - half);
+        ctx.lineTo(sx(tip - dir * back), cy);
+        ctx.lineTo(sx(base), cy + half);
+        ctx.fill();
+      }
+      for (const [dx, dy] of [[-6, -5], [-12, 4], [-18, -3]]) rect(tip + dir * dx, cy + dy, 2, 2, flick ? "#bff0ff" : "#ffffff");
+    } else {
+      // two lightning rings spinning around the hero, bolts crackling out to both sides
+      const cx = b.x - camX + b.w / 2;
+      const cy = b.y + b.h / 2;
+      const spin = t * Math.PI * 4;
+      ctx.strokeStyle = flick ? "#c48bff" : "#f1dcff";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, b.w / 2 - 2, b.h / 2 - 4, 0, spin, spin + Math.PI * 1.3);
+      ctx.stroke();
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, b.w / 2 - 8, b.h / 2 - 8, 0, spin + Math.PI, spin + Math.PI * 2.1);
+      ctx.stroke();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1;
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        for (let i = 0; i <= 4; i += 1) {
+          const px = cx + side * (8 + i * 5.5);
+          const py = cy + (i % 2 ? -4 : 4) * (flick ? 1 : -1);
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+      }
+    }
+    ctx.lineCap = "butt";
+    ctx.globalAlpha = 1;
   }
 
   function drawEnemyBullet(b, game, time) {
@@ -602,10 +771,10 @@ export function createRenderer(canvas) {
       rect(x - 3, y + 3, 6, 3, "#ffd23f");
       rect(x - 4, y + 2, 8, 1, "#bfdbfe");
     } else if (kind === "life") {
-      rect(x - 5, y, 10, 9, HERO.armor);
-      rect(x - 1, y + 3, 6, 3, HERO.outline);
-      rect(x, y + 4, 4, 1, HERO.visor);
-      rect(x - 5, y, 10, 1, HERO.armorLight);
+      rect(x - 5, y, 10, 9, pal.armor);
+      rect(x - 1, y + 3, 6, 3, pal.outline);
+      rect(x, y + 4, 4, 1, pal.visor);
+      rect(x - 5, y, 10, 1, pal.armorLight);
     }
   }
 
@@ -653,6 +822,7 @@ export function createRenderer(canvas) {
     const jolt = shake > 0 ? Math.round((Math.random() - 0.5) * 4) : 0;
     ctx.setTransform(scale, 0, 0, scale, jolt * scale, 0);
     camX = Math.round(game.camX);
+    pal = game.player?.hero === "lam" ? LAM : HERO;
 
     drawBackground(theme, themeId, time);
     drawTiles(game.level, theme, themeId, time);

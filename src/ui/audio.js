@@ -92,6 +92,13 @@ export const sfx = {
     else tone(hz(19), 0.06, { gain: 0.05, slide: 0.6 });
   },
   special: () => tone(hz(3), 0.14, { type: "triangle", gain: 0.1, slide: 1.8 }),
+  /** Blade swing: a filtered whoosh, brighter on the combo finisher and charged slashes. */
+  slash(step = 0, charge = 0) {
+    noise(charge ? 0.16 : 0.09, { gain: charge ? 0.1 : 0.07, freq: 2600 + step * 900 + charge * 800 });
+    tone(hz(14 + step * 3 + charge * 4), 0.07, { type: "triangle", gain: 0.04, slide: 0.7 });
+    if (charge === 2) tone(hz(5), 0.25, { type: "sawtooth", gain: 0.07, slide: 1.6 });
+  },
+  parry: () => [24, 31].forEach((s, i) => tone(hz(s), 0.05, { type: "square", gain: 0.04, delay: i * 0.03 })),
   charge: (level) => tone(hz(level === 2 ? 24 : 17), 0.08, { type: "triangle", gain: 0.06 }),
   jump: () => tone(hz(0), 0.08, { type: "triangle", gain: 0.04, slide: 1.6 }),
   dash: () => noise(0.12, { gain: 0.05, freq: 1800 }),

@@ -4,6 +4,10 @@ An original browser game in the classic **run-and-gun action platformer** genre.
 and climb walls through three stages, charge your arm cannon, defeat each boss and **take its
 weapon**, then storm the final fortress.
 
+- 2 playable heroes: **Volt** (arm cannon, charge shots) and **Lam Phong** (energy blade: 3-hit combo,
+  spin slash in the air, charged wide slash and blade wave, slashes cut enemy shots). Pick on the title screen
+- Volt takes each boss's weapon as a new shot; Lam Phong learns it as a **new blade technique** instead:
+  **Hỏa Long Kiếm** (rising flame slash), **Băng Thứ Kiếm** (long ice thrust), **Lôi Toàn Kiếm** (lightning spin, both sides)
 - 4 stages: lava foundry, glacier, storm tower and the fortress core, each with checkpoints and a boss arena
 - Movement: variable jump, dash, dash-jump, wall slide and wall jump, coyote time and jump buffer
 - Buster with two charge levels plus 3 boss weapons. Each boss is weak to another boss's weapon
@@ -21,7 +25,7 @@ npm start      # http://127.0.0.1:5173
 |-----------------------|------------------------------------------|
 | `←` `→`               | Move                                     |
 | `Z` / `Space`         | Jump (hold = higher; press on a wall = wall jump) |
-| `X`                   | Shoot (hold to charge)                   |
+| `X`                   | Shoot / slash (hold to charge)           |
 | `C` / `Shift`         | Dash (jump while dashing = dash-jump)    |
 | `Q` / `E`             | Previous / next weapon                   |
 | `P` / `Esc`           | Pause                                    |
@@ -32,12 +36,12 @@ Gamepad: D-pad/stick to move, A to jump, X/Y to shoot, B/RT to dash, LB/RB to sw
 ## Test
 
 ```bash
-npm test       # 101 tests, ~2 s
+npm test       # 126 tests, ~2 s
 ```
 
 The suite includes two proofs. A **route search over the real player physics** shows every stage can
 be finished from the start and from every checkpoint, and a **scripted bot** beats every boss with
-the starting weapon.
+the starting weapon, for both heroes (Lam Phong with the blade alone).
 
 ## Project layout
 
@@ -50,6 +54,7 @@ src/core/                     pure game rules (no DOM), fully unit-tested
   level.js, stages.js         ASCII tile maps, chunk joiner, boss arena, the 4 stages
   physics.js                  AABB vs tiles, one-way platforms, hazards
   player.js                   movement, shooting, charge, damage
+  heroes.js                   the two heroes, Lam Phong's blade attacks
   weapons.js                  buster + 3 boss weapons
   enemies.js, bosses.js       enemy and boss AI
   game.js                     state machine: select, stage, door, boss, death, clear, victory
@@ -70,3 +75,9 @@ scripts/serve.mjs             zero-dependency static dev server
 
 Game design, characters, levels, art and music are original. It's a tribute to the genre, not a
 copy of any specific game. Licensed under MIT.
+
+## Analytics
+
+Optional, anonymous play counts via [GoatCounter](https://www.goatcounter.com): no cookies and no
+personal data. It is off until you set `GOATCOUNTER_CODE` in `src/ui/analytics.js`. Events are
+sent when a game starts and when it ends; see the `track(...)` calls in `src/main.js`.

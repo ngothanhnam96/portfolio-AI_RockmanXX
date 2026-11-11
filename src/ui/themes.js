@@ -64,3 +64,17 @@ export const HERO = Object.freeze({
   visor: "#5ff2ff",
   outline: "#120f1a",
 });
+
+/** Lam Phong, the swordsman: teal armour, gold visor, a white scarf and a teal energy blade. */
+export const LAM = Object.freeze({
+  armor: "#1fb5a0",
+  armorDark: "#0d6b60",
+  armorLight: "#8ff5df",
+  suit: "#23263d",
+  suitLight: "#3b4066",
+  visor: "#ffd84a",
+  outline: "#0e1018",
+  scarf: "#f4f1ea",
+  blade: "#3ff5c8",
+  bladeCore: "#eafff9",
+});

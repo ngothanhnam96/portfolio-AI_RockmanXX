@@ -20,6 +20,8 @@
 | T-14 | Input: keyboard, touch buttons, gamepad                            | FR-12              | ✅ |
 | T-15 | WebAudio sfx + chiptune music                                      | FR-11              | ✅ |
 | T-16 | Static dev server, CI, GitHub Pages                                | NFR-1, NFR-7       | ✅ |
+| T-22 | Lam Phong learns each boss weapon as a new blade technique (flame rising slash, ice thrust, lightning spin) | FR-8 | ✅ |
+| T-21 | Second hero Lam Phong: blade combo, air spin, charged slash/wave, shot cutting; hero picker | FR-1, FR-2 | ✅ |
 | T-17 | Ladders and vertical scrolling sections                            | —                  | ⏭ |
 | T-18 | Sub-tanks / upgrade capsules hidden in stages                      | —                  | ⏭ |
 | T-19 | Time-attack mode with per-stage best times                         | —                  | ⏭ |

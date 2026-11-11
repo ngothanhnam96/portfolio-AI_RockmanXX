@@ -6,6 +6,7 @@
 import { BOSS_TYPES } from "./core/bosses.js";
 import { DT } from "./core/constants.js";
 import { Game } from "./core/game.js";
+import { HERO_ORDER, HEROES, weaponInfo } from "./core/heroes.js";
 import { PLAYER } from "./core/player.js";
 import { STAGES } from "./core/stages.js";
 import { MAX_ENERGY, WEAPONS } from "./core/weapons.js";
@@ -13,7 +14,10 @@ import { isMuted, isMusicOn, playMusic, setMuted, setMusic, sfx, stopMusic } fro
 import { createInput } from "./ui/input.js";
 import { createRenderer, Particles } from "./ui/render.js";
 import { load, save } from "./ui/storage.js";
+import { initAnalytics, track } from "./ui/analytics.js";
 import { THEMES } from "./ui/themes.js";
+
+initAnalytics();
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -38,7 +42,11 @@ const els = {
 
 const STAGE_ICONS = { ember: "🔥", frost: "❄️", storm: "⚡", core: "🌀" };
 
-const game = new Game();
+const game = new Game({ hero: load("hero", "volt") });
+/** Weapon names depend on the hero: Volt's gun and shots, Lam Phong's blade and blade techniques. */
+const weaponName = (id) => weaponInfo(game.hero, id).name;
+const weaponShort = (id) => weaponInfo(game.hero, id).short;
+const weaponColor = (id) => weaponInfo(game.hero, id).color;
 const particles = new Particles();
 const renderer = createRenderer(els.canvas);
 let best = load("best", 0);
@@ -76,6 +84,19 @@ function handleEvents(events) {
         break;
       case "charge":
         sfx.charge(e.level);
+        break;
+      case "slash":
+        sfx.slash(e.step, e.charge);
+        if (e.weapon) {
+          sfx.special();
+          particles.burst(e.x + e.facing * 12, e.y, WEAPONS[e.weapon].color, 8, 80, { life: 0.3 });
+        }
+        if (e.charge === 2) particles.burst(e.x + e.facing * 10, e.y, "#3ff5c8", 8, 70, { life: 0.3 });
+        break;
+      case "parry":
+        sfx.parry();
+        particles.burst(e.x, e.y, "#eafff9", 6, 70, { life: 0.2 });
+        particles.ring(e.x, e.y, "#3ff5c8", 8, 0.2);
         break;
       case "jump":
       case "walljump":
@@ -181,7 +202,7 @@ function updateHud() {
   const p = game.player;
   const weapon = WEAPONS[game.weapon];
   const boss = game.boss;
-  const key = [p.hp, game.weapon, game.energy[game.weapon], game.lives, game.score, boss?.hp, game.unlockedWeapons.join()].join("|");
+  const key = [game.hero, p.hp, game.weapon, game.energy[game.weapon], game.lives, game.score, boss?.hp, game.unlockedWeapons.join()].join("|");
   if (key === hudCache) return;
   hudCache = key;
   els.hpFill.style.width = `${(p.hp / PLAYER.maxHp) * 100}%`;
@@ -189,14 +210,14 @@ function updateHud() {
   els.energyBar.hidden = weapon.cost === 0;
   els.energyFill.style.width = `${(game.energy[game.weapon] / MAX_ENERGY) * 100}%`;
   els.energyFill.style.background = weapon.color;
-  els.weaponLabel.textContent = weapon.name;
+  els.weaponLabel.textContent = weaponName(game.weapon);
   els.lives.textContent = `×${game.lives}`;
   els.score.textContent = game.score.toString().padStart(6, "0");
   els.weapons.innerHTML = game.unlockedWeapons
     .map((id) => {
-      const w = WEAPONS[id];
+      const name = weaponName(id);
       const active = id === game.weapon ? " active" : "";
-      return `<button class="weapon${active}" data-weapon="${id}" style="--wc:${w.color}" title="${w.name}" aria-label="${w.name}" aria-pressed="${id === game.weapon}">${w.short}</button>`;
+      return `<button class="weapon${active}" data-weapon="${id}" style="--wc:${weaponColor(id)}" title="${name}" aria-label="${name}" aria-pressed="${id === game.weapon}">${weaponShort(id)}</button>`;
     })
     .join("");
   els.bossBar.hidden = !boss;
@@ -229,29 +250,46 @@ const CONTROLS = `
   <table class="controls">
     <tr><td><kbd>←</kbd><kbd>→</kbd></td><td>Di chuyển</td></tr>
     <tr><td><kbd>Z</kbd> / <kbd>Space</kbd></td><td>Nhảy (giữ để nhảy cao, nhảy khi bám tường)</td></tr>
-    <tr><td><kbd>X</kbd></td><td>Bắn (giữ để tụ lực)</td></tr>
+    <tr><td><kbd>X</kbd></td><td>Bắn / chém (giữ để tụ lực)</td></tr>
     <tr><td><kbd>C</kbd> / <kbd>Shift</kbd></td><td>Lướt</td></tr>
     <tr><td><kbd>Q</kbd> <kbd>E</kbd></td><td>Đổi vũ khí</td></tr>
     <tr><td><kbd>P</kbd> · <kbd>M</kbd> · <kbd>N</kbd></td><td>Tạm dừng · Âm thanh · Nhạc</td></tr>
   </table>`;
 
-function titleScreen() {
+/** Two hero cards; the chosen one is remembered for next time. */
+function heroPicker() {
+  const cards = HERO_ORDER.map((id) => {
+    const h = HEROES[id];
+    const on = id === game.hero;
+    return `
+      <button class="hero-card hero-${id}${on ? " chosen" : ""}" data-hero="${id}" aria-pressed="${on}" style="--hc:${h.color}">
+        <span class="hero-face" aria-hidden="true"></span>
+        <span class="hero-name">${h.name}</span>
+        <span class="hero-role">${h.role} · ${h.primaryName}</span>
+        <span class="hero-blurb">${h.blurb}</span>
+      </button>`;
+  }).join("");
+  return `<div class="hero-grid" role="group" aria-label="Chọn nhân vật">${cards}</div>`;
+}
+
+function titleScreen({ focus = true } = {}) {
   const saved = load("progress", { defeated: [] });
   const canContinue = saved.defeated?.length > 0;
   showPanel(`
-    <p class="eyebrow">Run &amp; gun · 4 màn · 4 trùm</p>
+    <p class="eyebrow">Run &amp; gun · 2 nhân vật · 4 màn · 4 trùm</p>
     <h1 class="logo">CHIẾN BINH <span>VOLT</span></h1>
     <p class="lead">Ba cỗ máy nổi loạn chiếm lò đúc, đỉnh băng và tháp bão. Hạ từng tên, lấy vũ khí của chúng, rồi tấn công Pháo Đài Lõi.</p>
+    ${heroPicker()}
     <div class="buttons">
       <button class="primary" data-action="new">Chơi mới</button>
       ${canContinue ? `<button data-action="continue">Tiếp tục (${saved.defeated.length}/3 trùm)</button>` : ""}
     </div>
     ${CONTROLS}
     <p class="muted">Kỷ lục: ${best.toLocaleString("vi-VN")}</p>
-  `);
+  `, { focus });
 }
 
-function selectScreen() {
+function selectScreen({ focus = true } = {}) {
   const cards = STAGES.map((stage) => {
     const boss = BOSS_TYPES[stage.boss];
     const done = game.defeated.includes(stage.id);
@@ -267,10 +305,11 @@ function selectScreen() {
   }).join("");
   showPanel(`
     <h2>Chọn màn</h2>
+    ${heroPicker()}
     <div class="stage-grid">${cards}</div>
     <p class="muted">Mạng: ×${game.lives} · Điểm: ${game.score.toLocaleString("vi-VN")}</p>
     <div class="buttons"><button data-action="title" class="ghost">Màn hình chính</button></div>
-  `);
+  `, { focus });
 }
 
 function pauseScreen() {
@@ -286,12 +325,13 @@ function pauseScreen() {
 
 function clearScreen() {
   const info = game.clearInfo;
-  const weapon = info.weapon ? WEAPONS[info.weapon] : null;
+  const weapon = info.weapon ? weaponInfo(game.hero, info.weapon) : null;
+  const blade = game.heroSpec.primary === "blade";
   showPanel(`
     <p class="eyebrow">Hạ gục trùm</p>
     <h2>Màn hoàn thành!</h2>
-    ${weapon ? `<p class="reward" style="--wc:${weapon.color}">Nhận vũ khí: <strong>${weapon.name}</strong></p>
-      <p class="muted">Nhấn <kbd>Q</kbd>/<kbd>E</kbd> để đổi vũ khí. Mỗi trùm sợ vũ khí của một trùm khác.</p>` : ""}
+    ${weapon ? `<p class="reward" style="--wc:${weapon.color}">${blade ? "Lĩnh ngộ kiếm mới" : "Nhận vũ khí"}: <strong>${weapon.name}</strong></p>
+      <p class="muted">Nhấn <kbd>Q</kbd>/<kbd>E</kbd> để đổi ${blade ? "kiếm" : "vũ khí"}. Mỗi trùm sợ vũ khí của một trùm khác.</p>` : ""}
     <p>Thời gian: ${formatTime(info.time)} · Điểm: ${game.score.toLocaleString("vi-VN")}</p>
     <div class="buttons"><button class="primary" data-action="select">Tiếp tục</button></div>
   `);
@@ -324,9 +364,20 @@ els.panel.addEventListener("click", (event) => {
   if (!button || button.disabled) return;
   sfx.unlock();
   sfx.menu();
-  const { action, stage } = button.dataset;
+  const { action, stage, hero } = button.dataset;
+  if (hero) {
+    if (game.setHero(hero)) {
+      save("hero", hero);
+      track(`volt/hero-${hero}`);
+      if (game.state === "title") titleScreen({ focus: false });
+      else selectScreen({ focus: false });
+      els.panel.querySelector(`[data-hero="${hero}"]`)?.focus();
+    }
+    return;
+  }
   if (stage) {
     game.selectStage(stage);
+    track("volt/stage-start");
     particles.clear();
     hidePanel();
     playMusic(game.stage.theme);
@@ -374,12 +425,14 @@ function onStateChange(state, previous) {
     stopMusic();
     recordScore();
     save("progress", game.progress);
+    track(state === "clear" ? "volt/clear" : "volt/victory");
     if (state === "clear") clearScreen();
     else victoryScreen();
   } else if (state === "game-over") {
     sfx.gameOver();
     stopMusic();
     recordScore();
+    track("volt/game-over");
     gameOverScreen();
   } else if (state === "ready" && previous === "dying") {
     playMusic(game.stage.theme);

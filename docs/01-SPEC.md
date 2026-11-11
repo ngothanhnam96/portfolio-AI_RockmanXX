@@ -22,7 +22,7 @@ is weak to a weapon taken from another boss.
 | FR-5  | Every stage has **checkpoints**. Dying costs a life and respawns at the last checkpoint. With no lives left the game is over, but defeated bosses are kept. |
 | FR-6  | The boss door at the end scrolls the camera into a locked arena. Then come the boss intro, the fight and the boss health bar. |
 | FR-7  | 4 bosses, each with ≥ 3 attack patterns. The final boss has a second, faster phase below 50 % HP. |
-| FR-8  | Beating a boss unlocks its weapon: **Hỏa Cầu** (arcing, piercing fireball), **Băng Tiễn** (3-way spread), **Lôi Xà** (fast piercing bolt). Specials spend weapon energy. A boss takes **×3** damage from its weakness. |
+| FR-8  | Beating a boss unlocks its weapon: **Hỏa Cầu** (arcing, piercing fireball), **Băng Tiễn** (3-way spread), **Lôi Xà** (fast piercing bolt). Specials spend weapon energy. A boss takes **×3** damage from its weakness. Lam Phong gets each one as a blade technique instead (same energy and weakness): **Hỏa Long Kiếm** (rising flame slash that reaches flying bosses), **Băng Thứ Kiếm** (long ice thrust), **Lôi Toàn Kiếm** (lightning spin hitting both sides). |
 | FR-9  | Pickups: small/large health, weapon energy, extra life. Placed in stages and dropped by enemies. |
 | FR-10 | Stage select with progress. The fortress is locked until 3 bosses are down. Progress and best score are saved on the device. |
 | FR-11 | Pause / resume (auto-pause when the tab is hidden), sound on/off, music on/off. |

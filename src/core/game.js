@@ -11,6 +11,7 @@
 import { createBoss, damageBoss, updateBoss } from "./bosses.js";
 import { ROWS, TILE, VIEW_W } from "./constants.js";
 import { createEnemy, isShielded, rollDrop, updateEnemy } from "./enemies.js";
+import { BLADE, bladeArt, bladeAttack, heroById, HEROES, placeMelee } from "./heroes.js";
 import { inHazard, moveY, overlaps } from "./physics.js";
 import { NO_INPUT, Player, PLAYER } from "./player.js";
 import { mulberry32, randomSeed } from "./rng.js";
@@ -32,9 +33,10 @@ const DESPAWN_MARGIN = 72;
 const BOSS_STAGES = STAGES.filter((s) => !s.final).map((s) => s.id);
 
 export class Game {
-  constructor({ seed = randomSeed(), invincible = false } = {}) {
+  constructor({ seed = randomSeed(), invincible = false, hero = "volt" } = {}) {
     this.rng = mulberry32(seed);
     this.invincible = invincible; // tests / bots only
+    this.hero = heroById(hero).id;
     this.state = "title";
     this.events = [];
     this.defeated = [];
@@ -65,6 +67,17 @@ export class Game {
     this.newGame();
     this.defeated = (progress.defeated ?? []).filter((id) => BOSS_STAGES.includes(id));
     return this;
+  }
+
+  /** Pick the hero (title and stage select only; not in the middle of a stage). */
+  setHero(id) {
+    if (!HEROES[id] || this.player && !["title", "select"].includes(this.state)) return false;
+    this.hero = id;
+    return true;
+  }
+
+  get heroSpec() {
+    return heroById(this.hero);
   }
 
   get progress() {
@@ -155,6 +168,10 @@ export class Game {
     const at = this.checkpoint >= 0 ? level.checkpoints[this.checkpoint] : level.start;
     this.player = new Player(at.x, at.y);
     this.player.onGround = true;
+    this.player.hero = this.hero;
+    this.player.comboStep = 0;
+    this.player.comboT = 0;
+    this.player.slashCd = 0;
     this.enemies = [];
     this.bullets = [];
     this.enemyBullets = [];
@@ -223,6 +240,9 @@ export class Game {
   step(input, dt) {
     const player = this.player;
     const actions = player.update(input, this.level, dt, { canCharge: WEAPONS[this.weapon].charge });
+    player.comboT = Math.max(0, player.comboT - dt);
+    player.slashCd = Math.max(0, player.slashCd - dt);
+    if (player.comboT === 0) player.comboStep = 0;
     for (const action of actions) {
       if (action.type === "shoot") this.fire(action.charge);
       else this.emit(action.type, { x: player.cx, y: player.y + player.h, level: action.level });
@@ -287,6 +307,12 @@ export class Game {
     const player = this.player;
     const weapon = this.weapon;
     const spec = WEAPONS[weapon];
+    const blade = this.heroSpec.primary === "blade";
+    if (weapon === "buster" && blade) {
+      this.swing(charge);
+      return;
+    }
+    if (blade && player.slashCd > 0) return;
     if (weapon === "buster" && charge === 0) {
       const pellets = this.bullets.filter((b) => b.kind === "buster0").length;
       if (pellets >= MAX_BUSTER_SHOTS) return;
@@ -298,8 +324,48 @@ export class Game {
       }
       this.energy[weapon] -= spec.cost;
     }
+    if (blade) {
+      this.strike(weapon);
+      return;
+    }
     this.bullets.push(...fireWeapon(weapon, player.muzzle(), player.facing, charge));
     this.emit("shoot", { weapon, charge });
+  }
+
+  /** Lam Phong's blade: combo slashes on the ground, a spin in the air, charged wide slash / wave. */
+  swing(charge) {
+    const player = this.player;
+    if (charge === 0 && player.slashCd > 0) return;
+    const step = player.onGround && player.comboT > 0 ? (player.comboStep + 1) % BLADE.combo.length : 0;
+    const boxes = bladeAttack(player, { charge, step });
+    for (const box of boxes) if (box.melee) placeMelee(box, player);
+    this.bullets = this.bullets.filter((b) => !b.melee); // one slash out at a time
+    this.bullets.push(...boxes);
+    player.slashCd = BLADE.cooldown;
+    if (charge === 0 && player.onGround) {
+      player.comboStep = step;
+      player.comboT = BLADE.comboWindow;
+    } else {
+      player.comboStep = 0;
+      player.comboT = 0;
+    }
+    player.slashKind = boxes[0].kind;
+    player.slashStep = step;
+    this.emit("slash", { kind: boxes[0].kind, charge, step, x: player.cx, y: player.cy, facing: player.facing });
+  }
+
+  /** Lam Phong uses a boss weapon as a blade technique: one melee strike that carries its weakness. */
+  strike(weapon) {
+    const player = this.player;
+    const box = placeMelee(bladeArt(weapon, player), player);
+    this.bullets = this.bullets.filter((b) => !b.melee);
+    this.bullets.push(box);
+    player.slashCd = BLADE.artCooldown;
+    player.comboStep = 0;
+    player.comboT = 0;
+    player.slashKind = box.kind;
+    player.slashStep = 0;
+    this.emit("slash", { kind: box.kind, weapon, charge: 0, step: 0, x: player.cx, y: player.cy, facing: player.facing });
   }
 
   enemyShot(bullet) {
@@ -350,6 +416,11 @@ export class Game {
       level.isSolid(Math.floor((b.x + b.w / 2) / TILE), Math.floor((b.y + b.h / 2) / TILE));
 
     this.bullets = this.bullets.filter((b) => {
+      if (b.melee) {
+        b.life -= dt;
+        if (this.player?.alive) placeMelee(b, this.player);
+        return b.life > 0 && this.player?.alive;
+      }
       b.vy += b.gravity * dt;
       b.x += b.vx * dt;
       b.y += b.vy * dt;
@@ -402,8 +473,14 @@ export class Game {
     // player bullets → enemies / boss
     for (const b of this.bullets) {
       if (b.dead || b.deflected) continue;
+      if (b.melee || b.cuts) this.cutShots(b);
       for (const e of this.enemies) {
         if (e.hp <= 0 || b.hits.has(e) || !overlaps(b, e)) continue;
+        if (isShielded(e) && b.melee) {
+          b.hits.add(e); // the blade clangs off the shield, but the slash goes on
+          this.emit("deflect", { x: b.x + b.w / 2, y: b.y + b.h / 2 });
+          continue;
+        }
         if (isShielded(e)) {
           b.deflected = true;
           b.vx = -b.vx * 0.6;
@@ -422,10 +499,11 @@ export class Game {
         }
       }
       const boss = this.boss;
-      if (!b.dead && boss && boss.hp > 0 && overlaps(b, boss)) {
+      if (!b.dead && boss && boss.hp > 0 && !b.hits.has(boss) && overlaps(b, boss)) {
         const dealt = damageBoss(boss, b.damage, b.weapon);
         if (dealt > 0) {
-          b.dead = true;
+          if (b.melee || b.kind === "wave") b.hits.add(boss);
+          else b.dead = true;
           this.emit("boss-hit", { x: b.x + b.w / 2, y: b.y + b.h / 2, dealt, weak: b.weapon === boss.weakness });
           if (boss.hp <= 0) this.defeatBoss();
         }
@@ -447,7 +525,7 @@ export class Game {
       if (overlaps(player, e)) hurt(e.damage, e.x + e.w / 2);
     }
     for (const b of this.enemyBullets) {
-      if (b.warnT > 0 || !overlaps(player, b)) continue;
+      if (b.life <= 0 || b.warnT > 0 || !overlaps(player, b)) continue;
       if (hurt(b.damage, b.x + b.w / 2) && !b.ghost) b.life = 0;
     }
     this.enemyBullets = this.enemyBullets.filter((b) => b.life > 0);
@@ -468,6 +546,16 @@ export class Game {
       this.applyPickup(d.kind, d.x + d.w / 2, d.y + d.h);
       return false;
     });
+  }
+
+  /** A slash (or blade wave) destroys ordinary enemy shots it touches; beams and warnings are too big to cut. */
+  cutShots(blade) {
+    for (const shot of this.enemyBullets) {
+      if (shot.life <= 0 || shot.ghost || shot.warnT > 0 || !overlaps(blade, shot)) continue;
+      shot.life = 0;
+      this.score += 10;
+      this.emit("parry", { x: shot.x + shot.w / 2, y: shot.y + shot.h / 2 });
+    }
   }
 
   killEnemy(enemy) {
